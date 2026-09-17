@@ -635,9 +635,10 @@ runs_cover_heartbeat_window() {
 }
 
 # List runs of $workflow without search filters until the oldest createdAt is at
-# least max_age_seconds old, GitHub has no more runs, or HEARTBEAT_RUN_LIST_MAX
-# is reached. Prints a JSON array of {createdAt,event,conclusion}.
-# Optional $5/$6 override page size and max limit (tests).
+# least max_age_seconds old, or GitHub has no more runs. Prints a JSON array of
+# {createdAt,event,conclusion}. Returns non-zero if HEARTBEAT_RUN_LIST_MAX is
+# reached before the window is covered (truncated list must not look like a
+# real miss). Optional $5/$6 override page size and max limit (tests).
 list_workflow_runs_covering_window() {
   local repo="$1" workflow="$2" now_epoch="$3" max_age_seconds="$4"
   local page_size="${5:-$HEARTBEAT_RUN_LIST_PAGE_SIZE}"
@@ -649,9 +650,13 @@ list_workflow_runs_covering_window() {
       --limit "$limit" --json createdAt,event,conclusion)"
     count="$(jq 'length' <<<"$json")"
     if runs_cover_heartbeat_window "$json" "$now_epoch" "$max_age_seconds" \
-      || (( count < limit )) || (( limit >= max_limit )); then
+      || (( count < limit )); then
       printf '%s\n' "$json"
       return 0
+    fi
+    if (( limit >= max_limit )); then
+      phase_err "reached HEARTBEAT_RUN_LIST_MAX ($max_limit) before covering the heartbeat window"
+      return 1
     fi
     limit=$((limit + page_size))
     if (( limit > max_limit )); then

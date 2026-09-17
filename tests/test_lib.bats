@@ -754,3 +754,23 @@ teardown() {
   [ "$(jq 'length' <<<"$got")" -eq 4 ]
   [ "$(printf '%s\n' "$got" | latest_successful_scheduled_created_at)" = "$old" ]
 }
+
+@test "list_workflow_runs_covering_window: fails when max limit is hit before the window is covered" {
+  # shellcheck source=tests/helpers/mock_gh.bash
+  source "$BATS_TEST_DIRNAME/helpers/mock_gh.bash"
+  install_mock_gh
+  local now=2000000 max_age=1000000 i fresh json
+  fresh="$(date -u -d @$((now - 10)) +%Y-%m-%dT%H:%M:%SZ)"
+  json='['
+  for i in 1 2 3 4; do
+    json+="$(printf '{"createdAt":"%s","event":"repository_dispatch","conclusion":"success"}' "$fresh")"
+    [[ "$i" -lt 4 ]] && json+=','
+  done
+  json+=']'
+  export MOCK_RUN_LIST_JSON="$json"
+
+  run list_workflow_runs_covering_window testorg/boost-docs-translation sync-translation.yml "$now" "$max_age" 2 2
+  restore_mock_gh
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"HEARTBEAT_RUN_LIST_MAX"* ]]
+}
