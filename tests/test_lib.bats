@@ -685,3 +685,32 @@ teardown() {
 @test "heartbeat_run_is_stale: at the threshold boundary is still fresh (strict older-than)" {
   ! heartbeat_run_is_stale 100000 200000 100000
 }
+
+@test "latest_successful_scheduled_created_at: newest createdAt when rows are out of order" {
+  local json got
+  json='[
+    {"createdAt":"2026-09-13T00:46:09Z","event":"schedule","conclusion":"success"},
+    {"createdAt":"2026-09-17T00:40:56Z","event":"schedule","conclusion":"success"},
+    {"createdAt":"2026-09-16T00:41:03Z","event":"schedule","conclusion":"success"}
+  ]'
+  got="$(printf '%s\n' "$json" | latest_successful_scheduled_created_at)"
+  [ "$got" = "2026-09-17T00:40:56Z" ]
+}
+
+@test "latest_successful_scheduled_created_at: ignores dispatch and non-success rows" {
+  local json got
+  json='[
+    {"createdAt":"2026-09-13T00:46:09Z","event":"schedule","conclusion":"success"},
+    {"createdAt":"2026-09-18T00:00:00Z","event":"repository_dispatch","conclusion":"success"},
+    {"createdAt":"2026-09-18T01:00:00Z","event":"schedule","conclusion":"failure"},
+    {"createdAt":"2026-09-17T00:40:56Z","event":"schedule","conclusion":"success"}
+  ]'
+  got="$(printf '%s\n' "$json" | latest_successful_scheduled_created_at)"
+  [ "$got" = "2026-09-17T00:40:56Z" ]
+}
+
+@test "latest_successful_scheduled_created_at: empty array emits nothing" {
+  local got
+  got="$(printf '%s\n' '[]' | latest_successful_scheduled_created_at)"
+  [ -z "$got" ]
+}

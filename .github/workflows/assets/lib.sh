@@ -606,3 +606,19 @@ heartbeat_run_is_stale() {
   [[ -z "$last_success_epoch" || "$last_success_epoch" == "0" ]] && return 0
   (( now_epoch - last_success_epoch > max_age_seconds ))
 }
+
+# Read a gh run list JSON array from stdin ({createdAt,event,conclusion} per
+# row). Emit the newest createdAt among successful scheduled runs. Empty or
+# no-match input emits nothing so the heartbeat treats it as none on record.
+# Callers must not pass --event/--status/--branch/--created to gh: those
+# filters use GitHub's search index, whose first page is not reliably newest.
+latest_successful_scheduled_created_at() {
+  jq -r '
+    [ .[]
+      | select(.event == "schedule" and .conclusion == "success")
+      | .createdAt
+    ]
+    | sort
+    | .[-1] // empty
+  '
+}

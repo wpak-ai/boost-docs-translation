@@ -50,14 +50,16 @@ jobs:
 
           # createdAt is when the run was scheduled; updatedAt moves when an old
           # run is rerun, which would make a stopped schedule look healthy.
+          # Do not pass --event/--status/--branch/--created: those filters send
+          # List workflow runs through GitHub's search index, where --limit 1
+          # is not the newest success (false stale alerts). Fetch a recent page
+          # and pick max createdAt of successful scheduled runs locally.
           last_ts="$(gh run list \
             --repo "$GITHUB_REPOSITORY" \
             --workflow sync-translation.yml \
-            --event schedule \
-            --status success \
-            --limit 1 \
-            --json createdAt \
-            --jq '.[0].createdAt // ""')"
+            --limit 50 \
+            --json createdAt,event,conclusion \
+            | latest_successful_scheduled_created_at)"
 
           last_epoch=""
           if [[ -n "$last_ts" ]]; then
