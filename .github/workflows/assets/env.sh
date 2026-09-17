@@ -20,6 +20,10 @@ if [[ -z "${_ENV_SH_LOADED:-}" ]]; then
   # Missed-run heartbeat: alert when the last successful scheduled sync is older
   # than this. Margin above the 24h cron cadence so a delayed run does not trip the alert.
   readonly HEARTBEAT_MAX_AGE_HOURS=30
+  # Unfiltered gh run list page size / ceiling while covering HEARTBEAT_MAX_AGE_HOURS.
+  # Search filters (--event/--status/--created/--branch) are not used; see lib.sh.
+  readonly HEARTBEAT_RUN_LIST_PAGE_SIZE=100
+  readonly HEARTBEAT_RUN_LIST_MAX=1000
 
   # start-translation submodule mode (START_PHASE env).
   readonly START_PHASE_MIRRORS="mirrors"

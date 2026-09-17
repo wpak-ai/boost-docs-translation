@@ -72,6 +72,26 @@ case "$cmd" in
       fi
       exit 0
     fi
+    if [[ "${1:-}" == "list" ]]; then
+      limit=20
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --limit)
+            limit="${2:-20}"
+            shift 2
+            ;;
+          *)
+            shift
+            ;;
+        esac
+      done
+      if [[ -n "${MOCK_RUN_LIST_JSON:-}" ]]; then
+        jq --argjson n "$limit" '.[0:$n]' <<<"$MOCK_RUN_LIST_JSON"
+      else
+        printf '%s\n' '[]'
+      fi
+      exit "${MOCK_RUN_LIST_EXIT:-0}"
+    fi
     ;;
 esac
 
@@ -94,6 +114,7 @@ restore_mock_gh() {
   unset MOCK_REPO_CREATE_EXIT MOCK_GH_PATCH_LOG MOCK_GH_PATCH_EXIT
   unset MOCK_PR_LIST_STDOUT MOCK_PR_LIST_STDERR MOCK_PR_LIST_EXIT
   unset MOCK_RUN_VIEW_EXIT MOCK_RUN_VIEW_JSON
+  unset MOCK_RUN_LIST_JSON MOCK_RUN_LIST_EXIT
 }
 
 reset_mock_gh() {
@@ -102,8 +123,9 @@ reset_mock_gh() {
   export MOCK_RUN_VIEW_EXIT=0
   unset MOCK_LIBRARIES_FIXTURE MOCK_GH_API_EXIT MOCK_REPO_CREATE_EXIT
   unset MOCK_PR_LIST_STDOUT MOCK_PR_LIST_STDERR MOCK_PR_LIST_EXIT
-  unset MOCK_RUN_VIEW_JSON
+  unset MOCK_RUN_VIEW_JSON MOCK_RUN_LIST_JSON
   export MOCK_PR_LIST_EXIT=0
+  export MOCK_RUN_LIST_EXIT=0
   if [[ -n "${MOCK_GH_DIR:-}" ]]; then
     MOCK_GH_PATCH_LOG="$MOCK_GH_DIR/gh-patch.log"
     : > "$MOCK_GH_PATCH_LOG"

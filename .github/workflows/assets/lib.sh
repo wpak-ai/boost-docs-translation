@@ -622,3 +622,40 @@ latest_successful_scheduled_created_at() {
     | .[-1] // empty
   '
 }
+
+# True when json (gh run list array) includes at least one createdAt at least
+# max_age_seconds before now_epoch, i.e. the fetch has walked past the heartbeat
+# window. Empty input does not cover the window.
+runs_cover_heartbeat_window() {
+  local json="$1" now_epoch="$2" max_age_seconds="$3" oldest
+  oldest="$(jq -r '[.[].createdAt] | min // empty' <<<"$json")"
+  [[ -z "$oldest" ]] && return 1
+  oldest="$(date -d "$oldest" +%s)"
+  (( now_epoch - oldest >= max_age_seconds ))
+}
+
+# List runs of $workflow without search filters until the oldest createdAt is at
+# least max_age_seconds old, GitHub has no more runs, or HEARTBEAT_RUN_LIST_MAX
+# is reached. Prints a JSON array of {createdAt,event,conclusion}.
+# Optional $5/$6 override page size and max limit (tests).
+list_workflow_runs_covering_window() {
+  local repo="$1" workflow="$2" now_epoch="$3" max_age_seconds="$4"
+  local page_size="${5:-$HEARTBEAT_RUN_LIST_PAGE_SIZE}"
+  local max_limit="${6:-$HEARTBEAT_RUN_LIST_MAX}"
+  local limit="$page_size" json count
+
+  while true; do
+    json="$(gh run list --repo "$repo" --workflow "$workflow" \
+      --limit "$limit" --json createdAt,event,conclusion)"
+    count="$(jq 'length' <<<"$json")"
+    if runs_cover_heartbeat_window "$json" "$now_epoch" "$max_age_seconds" \
+      || (( count < limit )) || (( limit >= max_limit )); then
+      printf '%s\n' "$json"
+      return 0
+    fi
+    limit=$((limit + page_size))
+    if (( limit > max_limit )); then
+      limit=$max_limit
+    fi
+  done
+}

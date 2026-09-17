@@ -51,22 +51,21 @@ jobs:
           # createdAt is when the run was scheduled; updatedAt moves when an old
           # run is rerun, which would make a stopped schedule look healthy.
           # Do not pass --event/--status/--branch/--created: those filters send
-          # List workflow runs through GitHub's search index, where --limit 1
-          # is not the newest success (false stale alerts). Fetch a recent page
-          # and pick max createdAt of successful scheduled runs locally.
-          last_ts="$(gh run list \
-            --repo "$GITHUB_REPOSITORY" \
-            --workflow sync-translation.yml \
-            --limit 50 \
-            --json createdAt,event,conclusion \
+          # List workflow runs through GitHub's search index, where the first
+          # page is not the newest success (false stale alerts). Fetch unfiltered
+          # pages until they cover HEARTBEAT_MAX_AGE_HOURS, then pick max
+          # createdAt of successful scheduled runs locally.
+          now_epoch="$(date +%s)"
+          max_age_seconds=$(( HEARTBEAT_MAX_AGE_HOURS * 3600 ))
+          last_ts="$(list_workflow_runs_covering_window \
+            "$GITHUB_REPOSITORY" sync-translation.yml \
+            "$now_epoch" "$max_age_seconds" \
             | latest_successful_scheduled_created_at)"
 
           last_epoch=""
           if [[ -n "$last_ts" ]]; then
             last_epoch="$(date -d "$last_ts" +%s)"
           fi
-          now_epoch="$(date +%s)"
-          max_age_seconds=$(( HEARTBEAT_MAX_AGE_HOURS * 3600 ))
 
           if heartbeat_run_is_stale "$last_epoch" "$now_epoch" "$max_age_seconds"; then
             last_desc="${last_ts:-none on record}"

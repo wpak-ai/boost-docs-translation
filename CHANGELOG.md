@@ -18,7 +18,7 @@ are a separate namespace — see [README](README.md#releases) and
   scheduled sync. Those filters use GitHub's search index, whose first page
   is not reliably newest-first, which produced false stale-heartbeat alerts
   while daily **`sync-translation`** was still succeeding. The workflow now
-  lists a recent unfiltered page and
+  lists unfiltered runs until they cover **`HEARTBEAT_MAX_AGE_HOURS`**, then
   **`latest_successful_scheduled_created_at`** selects the max `createdAt`
   among successful scheduled runs.
 
